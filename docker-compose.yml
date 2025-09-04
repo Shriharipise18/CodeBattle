@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  # MongoDB
+  mongodb:
+    image: mongo:7.0
+    container_name: coding-game-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: coding-game
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+      - ./server/scripts/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+
+  # Redis
+  redis:
+    image: redis:7-alpine
+    container_name: coding-game-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+
+  # Backend Server
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: coding-game-server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: mongodb://mongodb:27017/coding-game
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:-super-secret-jwt-key-change-in-production}
+      JUDGE0_URL: ${JUDGE0_URL}
+      JUDGE0_API_KEY: ${JUDGE0_API_KEY}
+      CLIENT_URL: http://localhost:5173
+    ports:
+      - "3001:3001"
+    depends_on:
+      - mongodb
+      - redis
+    volumes:
+      - ./server:/app
+      - /app/node_modules
+
+  # Frontend (Development)
+  client:
+    build:
+      context: .
+      dockerfile: Dockerfile.client
+    container_name: coding-game-client
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:3001
+      VITE_SOCKET_URL: http://localhost:3001
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./src:/app/src
+      - ./public:/app/public
+      - ./package.json:/app/package.json
+      - ./vite.config.ts:/app/vite.config.ts
+      - ./tailwind.config.js:/app/tailwind.config.js
+      - /app/node_modules
+    depends_on:
+      - server
+
+volumes:
+  mongodb_data:
+  redis_data:
+
+networks:
+  default:
+    name: coding-game-network

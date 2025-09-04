@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  # Load Balancer
+  nginx:
+    image: nginx:alpine
+    container_name: coding-game-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf
+      - ./ssl:/etc/nginx/ssl
+    depends_on:
+      - server1
+      - server2
+
+  # MongoDB Cluster
+  mongodb-primary:
+    image: mongo:7.0
+    container_name: coding-game-mongodb-primary
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
+      MONGO_INITDB_DATABASE: coding-game
+    volumes:
+      - mongodb_primary_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/init.js
+    ports:
+      - "27017:27017"
+    command: mongod --replSet rs0 --bind_ip_all
+
+  mongodb-secondary:
+    image: mongo:7.0
+    container_name: coding-game-mongodb-secondary  
+    restart: unless-stopped
+    depends_on:
+      - mongodb-primary
+    volumes:
+      - mongodb_secondary_data:/data/db
+    ports:
+      - "27018:27017"
+    command: mongod --replSet rs0 --bind_ip_all
+
+  # Redis Cluster
+  redis-master:
+    image: redis:7-alpine
+    container_name: coding-game-redis-master
+    restart: unless-stopped
+    volumes:
+      - redis_master_data:/data
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --save 60 1000
+
+  redis-slave:
+    image: redis:7-alpine
+    container_name: coding-game-redis-slave
+    restart: unless-stopped
+    depends_on:
+      - redis-master
+    volumes:
+      - redis_slave_data:/data
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes --save 60 1000 --slaveof redis-master 6379
+
+  # Backend Instances
+  server1:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile.prod
+    container_name: coding-game-server1
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: mongodb://admin:${MONGO_ROOT_PASSWORD}@mongodb-primary:27017,mongodb-secondary:27017/coding-game?authSource=admin&replicaSet=rs0
+      REDIS_URL: redis://redis-master:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JUDGE0_URL: ${JUDGE0_URL}
+      JUDGE0_API_KEY: ${JUDGE0_API_KEY}
+      SERVER_ID: server1
+    depends_on:
+      - mongodb-primary
+      - redis-master
+    volumes:
+      - ../server:/app
+      - /app/node_modules
+
+  server2:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile.prod
+    container_name: coding-game-server2
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+      MONGODB_URI: mongodb://admin:${MONGO_ROOT_PASSWORD}@mongodb-primary:27017,mongodb-secondary:27017/coding-game?authSource=admin&replicaSet=rs0
+      REDIS_URL: redis://redis-master:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JUDGE0_URL: ${JUDGE0_URL}
+      JUDGE0_API_KEY: ${JUDGE0_API_KEY}
+      SERVER_ID: server2
+    depends_on:
+      - mongodb-primary
+      - redis-master
+    volumes:
+      - ../server:/app
+      - /app/node_modules
+
+  # Frontend
+  client:
+    build:
+      context: ..
+      dockerfile: Dockerfile.prod
+    container_name: coding-game-client
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: https://api.yourdomain.com
+      VITE_SOCKET_URL: https://api.yourdomain.com
+    depends_on:
+      - server1
+      - server2
+
+  # Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: coding-game-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: coding-game-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+
+volumes:
+  mongodb_primary_data:
+  mongodb_secondary_data:
+  redis_master_data:
+  redis_slave_data:
+  prometheus_data:
+  grafana_data:
+
+networks:
+  default:
+    name: coding-game-production
+    driver: bridge
