@@ -60,43 +60,7 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-## 🎯 Weekly Development Roadmap
 
-### Week 1-2: Core Infrastructure
-- ✅ Authentication system (JWT, bcrypt)
-- ✅ Database models (User, Game, Problem)
-- ✅ Socket.io real-time communication
-- ✅ Basic game flow (create, join, start)
-
-### Week 3-4: Game Mechanics
-- ✅ Judge0 integration for code execution
-- ✅ Scoring system and leaderboards
-- ✅ Problem management and test cases
-- ✅ Real-time code synchronization
-
-### Week 5-6: Advanced Features
-- ✅ Matchmaking service with rating-based pairing
-- ✅ AI bot opponents with configurable difficulty
-- ✅ Spectator mode for live game viewing
-- ✅ Chat system and social features
-
-### Week 7-8: Production Readiness
-- ✅ Docker containerization
-- ✅ Security hardening (rate limiting, input validation)
-- ✅ Performance optimization (Redis adapter, caching)
-- ✅ Comprehensive error handling
-
-### Week 9-10: Testing & Deployment
-- ✅ Unit and integration tests
-- ✅ Load testing and performance benchmarks
-- ✅ CI/CD pipeline setup
-- ✅ Production deployment guides
-
-### Week 11-12: Monitoring & Scaling
-- ✅ Health checks and monitoring
-- ✅ Logging and error tracking
-- ✅ Horizontal scaling configuration
-- ✅ Documentation and maintenance guides
 
 ## 📊 API Endpoints
 
@@ -373,4 +337,3 @@ CLIENT_URL=http://localhost:5173
 
 ---
 
-Built with ❤️ using modern web technologies for competitive programming excellence.
